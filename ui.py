@@ -1,7 +1,6 @@
 import os
 import streamlit as st
 import psycopg2
-from google import genai
 from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
 
@@ -17,9 +16,7 @@ if not SUPABASE_CONN_STRING:
 def load_model():  # <-- We will explicitly name it load_model here
     return SentenceTransformer("all-mpnet-base-v2")
 
-embedding_model = load_model()
-
-st.title("🌱 NGO Volunteer AI Coordinator")
+st.title("NGO Volunteer AI Coordinator")
 st.write("Ask the AI chatbot to find relevant local community events!")
 
 user_query = st.text_input("How would you like to help today?", placeholder="e.g., I want to help with animals or nature...")
@@ -27,22 +24,21 @@ user_query = st.text_input("How would you like to help today?", placeholder="e.g
 if user_query:
     with st.spinner("Searching matching events..."):
         try:
+            embedding_model = load_model()
+
             # 1. Generate clean list vector
-            raw_embeddings = embedding_model.encode(user_query)
+            raw_embeddings = embedding_model.encode(user_query, show_progress_bar=False)
             query_vector = [float(x) for x in raw_embeddings]
 
             # 2. Run explicit type-casted PostgreSQL vector scan
             conn = psycopg2.connect(SUPABASE_CONN_STRING)
-            cursor = conn.cursor()
-            
-            cursor.execute(
-                "SELECT event_name, location, event_date, description FROM match_events(%s::vector, 0.2, 3);", 
-                (query_vector,)
-            )
-            results = cursor.fetchall()
-            
-            cursor.close()
-            conn.close()
+            with conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT event_name, location, event_date, description FROM match_events(%s::vector, 0.2, 3);",
+                        (query_vector,)
+                    )
+                    results = cursor.fetchall()
 
             # 3. Dynamic display
             if results:
