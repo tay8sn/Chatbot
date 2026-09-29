@@ -1,2 +1,5 @@
 psycopg2-binary
 google-genai
+sentence-transformers
+pydantic
+python-dotenv
